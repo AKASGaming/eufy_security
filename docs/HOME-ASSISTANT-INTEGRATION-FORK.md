@@ -34,7 +34,13 @@ Alternative: **HACS** → **Integrations** → **Eufy Security** → **⋮** →
 
 ## Not in the brands / integration list?
 
-If this worked before and stopped after a GitHub branch cleanup: HACS was probably still downloading the deleted **`master`** branch. This fork again uses **`master`** as the default (same as [fuatakgun/eufy_security](https://github.com/fuatakgun/eufy_security)).
+### UTF-8 BOM in manifest (fixed in 8.2.50+)
+
+If there are **no** `eufy_security` lines in HA logs, `manifest.json` may have been saved with a **UTF-8 BOM** (`EF BB BF` before `{`). Home Assistant then **ignores** the integration entirely. Redownload from this repo after the BOM fix, or use [MANUAL-INSTALL.md](MANUAL-INSTALL.md).
+
+### HACS branch / master
+
+If this stopped after a GitHub branch cleanup: HACS may have cached the deleted **`master`** branch. This fork uses **`master`** as default again (same as [fuatakgun/eufy_security](https://github.com/fuatakgun/eufy_security)).
 
 **Fix in HACS:**
 
