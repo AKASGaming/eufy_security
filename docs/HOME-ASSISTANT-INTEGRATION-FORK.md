@@ -30,11 +30,21 @@ Alternative: **HACS** → **Integrations** → **Eufy Security** → **⋮** →
 
 ## Version
 
-**8.2.50** on branch **`main`** (only branch on this fork).
+**8.2.50** on branch **`master`** (default; matches upstream). Branch **`main`** is kept in sync for older links.
 
-## Not in the integration list?
+## Not in the brands / integration list?
 
-Work through this list in order:
+If this worked before and stopped after a GitHub branch cleanup: HACS was probably still downloading the deleted **`master`** branch. This fork again uses **`master`** as the default (same as [fuatakgun/eufy_security](https://github.com/fuatakgun/eufy_security)).
+
+**Fix in HACS:**
+
+1. **HACS** → **Integrations** → **Eufy Security** → if present, **Remove** (HACS side only).
+2. **HACS** → **⋮** → **Custom repositories** → remove `AKASGaming/eufy_security`, save.
+3. Re-add custom repository: `https://github.com/AKASGaming/eufy_security` (Integration).
+4. **Download** / **Update** Eufy Security → **Restart Home Assistant**.
+5. **Add integration** → search **`Eufy Security`**.
+
+Work through this list if it still does not appear:
 
 ### 1. Confirm HACS actually installed the files
 
