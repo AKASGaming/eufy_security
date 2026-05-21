@@ -363,8 +363,12 @@ class ApiClient:
         if future not in ("", None) and hasattr(future, "exception"):
             try:
                 exc = future.exception()
+            except asyncio.CancelledError:
+                exc = None
             except Exception:  # pylint: disable=broad-except
                 exc = None
+        if isinstance(exc, asyncio.CancelledError):
+            exc = None
         _LOGGER.debug("on_close - websocket to add-on closed (exc=%s)", exc)
         if exc is not None and self._on_error_callback is not None:
             self._on_error_callback(future)
@@ -375,13 +379,17 @@ class ApiClient:
 
     async def _send_message_get_response(self, message: OutgoingMessage) -> dict:
         await self._ensure_ws()
-        future: "asyncio.Future[dict]" = asyncio.get_event_loop().create_future()
+        future: "asyncio.Future[dict]" = asyncio.get_running_loop().create_future()
         self._result_futures[message.id] = future
-        await self.send_message(message.content)
         try:
-            return await future
+            await self.send_message(message.content)
+            return await asyncio.wait_for(future, timeout=45)
+        except asyncio.TimeoutError as exc:
+            raise WebSocketConnectionException(
+                "Timed out waiting for the Eufy Security add-on. Reload the integration or check WS add-on logs."
+            ) from exc
         finally:
-            self._result_futures.pop(message.id)
+            self._result_futures.pop(message.id, None)
 
     async def send_message(self, message: dict) -> None:
         """send message to websocket api"""

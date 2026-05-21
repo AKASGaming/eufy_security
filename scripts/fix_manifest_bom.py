@@ -15,7 +15,7 @@ data = {
     "iot_class": "cloud_push",
     "issue_tracker": "https://github.com/AKASGaming/eufy_security/issues",
     "requirements": ["websocket-client==1.8.0", "aiortsp==1.4.0"],
-    "version": "8.2.57",
+    "version": "8.2.58",
 }
 
 text = json.dumps(data, indent=2) + "\n"

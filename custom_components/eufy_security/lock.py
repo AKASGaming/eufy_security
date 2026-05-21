@@ -12,6 +12,7 @@ from .const import COORDINATOR, DOMAIN
 from .coordinator import EufySecurityDataUpdateCoordinator
 from .entity import EufySecurityEntity
 from .eufy_security_api.const import MessageField
+from .eufy_security_api.exceptions import FailedCommandException, WebSocketConnectionException
 from .eufy_security_api.metadata import Metadata
 from .eufy_security_api.product import Device, Product
 
@@ -98,18 +99,36 @@ class EufySecurityLock(EufySecurityEntity, LockEntity):
         super()._handle_coordinator_update()
         self.async_write_ha_state()
 
+    def _apply_local_lock_state(self, value: bool) -> None:
+        """Optimistic UI update; MQTT heartbeats will confirm."""
+        self._control_product.properties[MessageField.LOCKED.value] = value
+        self._control_product.properties[MessageField.LOCK_STATUS.value] = 4 if value else 3
+        self._control_product._sync_property_to_paired(MessageField.LOCKED.value, value)
+        self._control_product._sync_property_to_paired(
+            MessageField.LOCK_STATUS.value, self._control_product.properties[MessageField.LOCK_STATUS.value]
+        )
+
     async def _set_locked(self, value: bool) -> None:
         if self._control_product.is_safe_lock is True and value is False:
             raise HomeAssistantError(
                 f"Unlocking is not supported for safe lock ({self._control_product.name})"
             )
-        # T85D0 / MQTT locks actuate via the ``locked`` property in the add-on driver.
-        await self.coordinator.api.set_property(
-            self._control_product.product_type,
+        _LOGGER.info(
+            "Lock command %s -> locked=%s",
             self._control_product.serial_no,
-            MessageField.LOCKED.value,
             value,
         )
+        try:
+            await self.coordinator.api.set_property(
+                self._control_product.product_type,
+                self._control_product.serial_no,
+                MessageField.LOCKED.value,
+                value,
+            )
+        except (FailedCommandException, WebSocketConnectionException) as exc:
+            raise HomeAssistantError(f"Lock command failed: {exc}") from exc
+        self._apply_local_lock_state(value)
+        self.async_write_ha_state()
 
     async def async_lock(self, **kwargs: Any) -> None:
         if self._control_product.is_safe_lock is True:

@@ -1,4 +1,4 @@
-﻿# Home Assistant integration fork (T85D0 / T85L0)
+# Home Assistant integration fork (T85D0 / T85L0)
 
 This fork adds a Home Assistant **lock** entity for Eufy smart locks that report state via `lockStatus` (MQTT), including **T85D0** and **T85L0**.
 

@@ -76,9 +76,15 @@ class WebSocketClient:
 
     def _on_close(self, future="") -> None:
         self.socket = None
-        _LOGGER.debug(f"websocket client _on_close {self.socket is not None}")
-        if self.close_callback is not None:
+        _LOGGER.debug("websocket client _on_close")
+        if self.close_callback is None:
+            return
+        try:
             self.close_callback(future)
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:  # pylint: disable=broad-except
+            _LOGGER.debug("close_callback raised (ignored): %s", exc)
 
     async def send_message(self, message):
         """Send message to websocket"""
