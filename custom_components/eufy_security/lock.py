@@ -13,24 +13,38 @@ from .coordinator import EufySecurityDataUpdateCoordinator
 from .entity import EufySecurityEntity
 from .eufy_security_api.const import MessageField, ProductType
 from .eufy_security_api.metadata import Metadata
-from .eufy_security_api.product import Product
+from .eufy_security_api.product import Device, Product
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
 
-def _iter_lock_products(coordinator: EufySecurityDataUpdateCoordinator):
-    """Devices and standalone-lock stations that support lock control."""
+def _iter_lock_setups(coordinator: EufySecurityDataUpdateCoordinator):
+    """Yield (control_product, locked_metadata) for each smart lock."""
     seen: set[str] = set()
-    for product in coordinator.devices.values():
-        if product.supports_lock_entity() and product.serial_no not in seen:
-            seen.add(product.serial_no)
-            yield product
-    for product in coordinator.stations.values():
-        if product.serial_no in seen:
+
+    for device in coordinator.devices.values():
+        if device.serial_no in seen:
             continue
-        if product.supports_lock_entity():
-            seen.add(product.serial_no)
-            yield product
+        locked_meta = device.get_lock_metadata()
+        if locked_meta is None or not device.supports_lock_entity():
+            continue
+        seen.add(device.serial_no)
+        yield device, locked_meta
+
+    for station in coordinator.stations.values():
+        if station.serial_no in seen:
+            continue
+        paired: Optional[Device] = coordinator.devices.get(station.serial_no)
+        if paired is not None:
+            locked_meta = paired.get_lock_metadata()
+            if locked_meta is not None and paired.supports_lock_entity():
+                seen.add(station.serial_no)
+                yield paired, locked_meta
+            continue
+        locked_meta = station.get_lock_metadata()
+        if locked_meta is not None and station.supports_lock_entity():
+            seen.add(station.serial_no)
+            yield station, locked_meta
 
 
 async def async_setup_entry(
@@ -38,51 +52,63 @@ async def async_setup_entry(
 ) -> None:
     """Setup lock entities."""
     coordinator: EufySecurityDataUpdateCoordinator = hass.data[DOMAIN][COORDINATOR]
-    metadatas: list[Metadata] = []
-    for product in _iter_lock_products(coordinator):
-        locked_meta = product.metadata.get(MessageField.LOCKED.value)
-        if locked_meta is not None:
-            metadatas.append(locked_meta)
-            _LOGGER.debug(
-                "Registering lock entity for %s (%s)",
-                product.name,
-                product.serial_no,
-            )
+    entities = []
+    for product, locked_meta in _iter_lock_setups(coordinator):
+        _LOGGER.debug(
+            "Registering lock entity for %s (%s)",
+            product.name,
+            product.serial_no,
+        )
+        entities.append(EufySecurityLock(coordinator, locked_meta, product))
 
-    entities = [EufySecurityLock(coordinator, metadata) for metadata in metadatas]
     async_add_entities(entities)
 
 
 class EufySecurityLock(LockEntity, EufySecurityEntity):
     """Lock entity for Eufy smart locks (including T85D0 / T85L0 MQTT locks)."""
 
-    def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:
+    def __init__(
+        self,
+        coordinator: EufySecurityDataUpdateCoordinator,
+        metadata: Metadata,
+        control_product: Product,
+    ) -> None:
         super().__init__(coordinator, metadata)
-        self._attr_name = f"{self.product.name}"
+        self._control_product = control_product
+        self._attr_name = f"{control_product.name}"
+        self._attr_entity_category = None
+        self._attr_entity_registry_enabled_default = True
+
+    @property
+    def product(self) -> Product:
+        return self._control_product
 
     @property
     def is_locked(self) -> Optional[bool]:
-        return self.product.get_lock_state()
+        return self._control_product.get_lock_state()
 
     async def _set_locked(self, value: bool) -> None:
-        if self.product.is_safe_lock is True and value is False:
-            raise HomeAssistantError(f"Unlocking is not supported for safe lock ({self.product.name})")
-        if self.product.product_type == ProductType.station:
-            await self.coordinator.api.set_property(
-                ProductType.device, self.product.serial_no, self.metadata.name, value
+        if self._control_product.is_safe_lock is True and value is False:
+            raise HomeAssistantError(
+                f"Unlocking is not supported for safe lock ({self._control_product.name})"
             )
-        else:
-            await self.product.set_property(self.metadata, value)
+        await self.coordinator.api.set_property(
+            ProductType.device, self._control_product.serial_no, self.metadata.name, value
+        )
 
     async def async_lock(self, **kwargs: Any) -> None:
-        if self.product.is_safe_lock is True:
-            raise HomeAssistantError(f"Locking is not supported for lock ({self.product.name})")
+        if self._control_product.is_safe_lock is True:
+            raise HomeAssistantError(
+                f"Locking is not supported for lock ({self._control_product.name})"
+            )
         await self._set_locked(True)
 
     async def async_unlock(self, **kwargs: Any) -> None:
         code = kwargs.get(ATTR_CODE, None)
-        if self.product.is_safe_lock is True and code is not None:
-            if await self.product.unlock(code) is False:
-                raise HomeAssistantError(f"PIN verification failed for lock ({self.product.name})")
+        if self._control_product.is_safe_lock is True and code is not None:
+            if await self._control_product.unlock(code) is False:
+                raise HomeAssistantError(
+                    f"PIN verification failed for lock ({self._control_product.name})"
+                )
         else:
             await self._set_locked(False)

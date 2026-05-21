@@ -184,6 +184,12 @@ class PropertyToEntityDescription(Enum):
     lockStatus = EntityDescription(id=auto(), category=EntityCategory.DIAGNOSTIC)
     leftOpenAlarm = EntityDescription(id=auto(), category=EntityCategory.DIAGNOSTIC)
 
+    # command buttons (must not be diagnostic or HA disables them by default)
+    trigger_alarm = EntityDescription(id=auto(), icon="mdi:alarm-light")
+    reset_alarm = EntityDescription(id=auto(), icon="mdi:alarm-light-outline")
+    reboot = EntityDescription(id=auto(), icon="mdi:restart")
+    verify_pin = EntityDescription(id=auto(), icon="mdi:lock")
+
     # fallback
     default = EntityDescription(id=auto(), category=EntityCategory.DIAGNOSTIC)
 

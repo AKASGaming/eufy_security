@@ -44,6 +44,9 @@ class EufySecurityButtonEntity(ButtonEntity, EufySecurityEntity):
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:
         super().__init__(coordinator, metadata)
+        # Command buttons must be enabled controls, not hidden diagnostic entities.
+        self._attr_entity_category = None
+        self._attr_entity_registry_enabled_default = True
 
     async def async_press(self) -> None:
         """Press the button."""
