@@ -1,7 +1,7 @@
-{
+﻿{
   "domain": "eufy_security",
   "name": "Eufy Security",
-  "codeowners": ["@fuatakgun"],
+  "codeowners": ["@fuatakgun", "@AKASGaming"],
   "config_flow": true,
   "dependencies": ["ffmpeg", "stream"],
   "documentation": "https://github.com/fuatakgun/eufy_security",
@@ -9,5 +9,5 @@
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/fuatakgun/eufy_security/issues",
   "requirements": ["websocket-client==1.8.0", "aiortsp==1.4.0"],
-  "version": "8.2.4"
+  "version": "8.2.5-t85d0.1"
 }

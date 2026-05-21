@@ -135,6 +135,29 @@ class Product:
         """Checks if product has required property"""
         return False if self.properties.get(property_name, None) is None else True
 
+    def supports_lock_entity(self) -> bool:
+        """Whether this product should expose a Home Assistant lock entity."""
+        locked_meta = self.metadata.get(MessageField.LOCKED.value)
+        if locked_meta is None:
+            return False
+        if self.has(MessageField.LOCKED.value) or self.has(MessageField.LOCK_STATUS.value):
+            return True
+        return bool(locked_meta.writeable)
+
+    def get_lock_state(self) -> bool | None:
+        """Return lock state from locked and/or lockStatus (Eufy: 4=locked, 3=unlocked)."""
+        locked = self.properties.get(MessageField.LOCKED.value)
+        if locked is not None:
+            return bool(locked)
+        lock_status = self.properties.get(MessageField.LOCK_STATUS.value)
+        if lock_status is None:
+            return None
+        if lock_status == 4:
+            return True
+        if lock_status == 3:
+            return False
+        return None
+
 
 class Device(Product):
     """Device as Physical Product"""

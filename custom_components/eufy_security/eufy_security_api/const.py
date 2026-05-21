@@ -63,6 +63,7 @@ class MessageField(Enum):
 
     # lock specific
     LOCKED = "locked"
+    LOCK_STATUS = "lockStatus"
     PIN = "pin"
     SUCCESSFULL = "successfull"
 
