@@ -35,6 +35,14 @@ class Product:
         self._set_metadata(metadata)
 
         self.pin_verified_future = None
+        self._lock_pending_target: Optional[bool] = None
+
+    def begin_lock_command(self, target_locked: bool) -> None:
+        """Mark an in-flight lock/unlock so stale MQTT updates are ignored."""
+        self._lock_pending_target = target_locked
+
+    def end_lock_command(self) -> None:
+        self._lock_pending_target = None
 
     def _set_properties(self, properties: dict) -> None:
         self.properties = properties
@@ -117,9 +125,51 @@ class Product:
         if other is not None and other is not self:
             other.properties[name] = value
 
+    def _lock_state_from_property(self, name: str, value: Any) -> Optional[bool]:
+        if name == MessageField.LOCKED.value:
+            return bool(value)
+        if name == MessageField.LOCK_STATUS.value:
+            return self._lock_status_to_bool(value)
+        return None
+
+    def _apply_lock_properties(self, locked: bool) -> None:
+        self.properties[MessageField.LOCKED.value] = locked
+        self.properties[MessageField.LOCK_STATUS.value] = 4 if locked else 3
+        self._sync_property_to_paired(MessageField.LOCKED.value, locked)
+        self._sync_property_to_paired(
+            MessageField.LOCK_STATUS.value, self.properties[MessageField.LOCK_STATUS.value]
+        )
+
     async def _handle_property_changed(self, event: Event):
         name = event.data[MessageField.NAME.value]
         value = event.data[MessageField.VALUE.value]
+
+        if name in (MessageField.LOCKED.value, MessageField.LOCK_STATUS.value):
+            reported = self._lock_state_from_property(name, value)
+            if (
+                self._lock_pending_target is not None
+                and reported is not None
+                and reported != self._lock_pending_target
+            ):
+                _LOGGER.debug(
+                    "Ignoring stale lock property %s=%s while pending %s (%s)",
+                    name,
+                    value,
+                    self._lock_pending_target,
+                    self.serial_no,
+                )
+                return
+
+        if name in (MessageField.LOCKED.value, MessageField.LOCK_STATUS.value):
+            if name == MessageField.LOCK_STATUS.value:
+                locked = self._lock_status_to_bool(value)
+                if locked is not None:
+                    self._apply_lock_properties(locked)
+            else:
+                self.properties[name] = value
+                self._sync_property_to_paired(name, value)
+            return
+
         self.properties[name] = value
         self._sync_property_to_paired(name, value)
 

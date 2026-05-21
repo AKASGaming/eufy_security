@@ -32,7 +32,14 @@ class EufySecurityDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_method=self._update_local, update_interval=timedelta(seconds=self.config.sync_interval))
         self._platforms = []
         self.data = {}
+        self._lock_command_locks: dict[str, asyncio.Lock] = {}
         self._api = ApiClient(self.config, aiohttp_client.async_get_clientsession(self.hass), self._on_error)
+
+    def lock_command_lock(self, serial_no: str) -> asyncio.Lock:
+        """Serialize lock/unlock commands per device (avoids rapid-toggle desync)."""
+        if serial_no not in self._lock_command_locks:
+            self._lock_command_locks[serial_no] = asyncio.Lock()
+        return self._lock_command_locks[serial_no]
 
     async def initialize(self):
         """Initialize the integration"""
