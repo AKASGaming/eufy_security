@@ -13,7 +13,7 @@ This fork adds a Home Assistant **lock** entity for Eufy smart locks that report
 2. Add repository:
    - **Repository:** `https://github.com/AKASGaming/eufy_security`
    - **Category:** Integration
-3. Search for **Eufy Security**, open it, choose branch **`feat/t85d0-smart-lock-c30`**, and **Download**.
+3. Search for **Eufy Security**, open it, and **Download** (uses default branch **`main`** — no branch picker needed).
 4. **Restart** Home Assistant.
 5. **Settings** → **Devices & services** → **Add integration** → **Eufy Security** → point at your WebSocket bridge (default port `3000`).
 
