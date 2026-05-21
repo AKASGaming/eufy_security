@@ -50,6 +50,8 @@ class ApiClient:
         self._stations: dict = None
         self._captcha_future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
         self._mfa_future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
+        self._driver_connected = False
+        self._listening = False
 
     @property
     def devices(self) -> dict:
@@ -70,6 +72,25 @@ class ApiClient:
         await self.ws_connect()
         await self._set_schema(SCHEMA_VERSION)
         await self._set_products()
+        self._driver_connected = True
+        self._listening = True
+
+    @property
+    def is_operational(self) -> bool:
+        """True when the add-on driver is up and products are loaded."""
+        return self._client is not None and self._driver_connected and bool(self._devices)
+
+    async def _ensure_ws(self) -> None:
+        """Reconnect WebSocket after idle close; add-on driver may still be connected."""
+        if self._client is None:
+            raise WebSocketConnectionException("Integration is not connected to the add-on.")
+        if self._client.available:
+            return
+        _LOGGER.debug("WebSocket to add-on closed; reconnecting")
+        await self._client.connect()
+        await self._set_schema(SCHEMA_VERSION)
+        await self._start_listening()
+        self._listening = True
 
     async def _check_interactive_mode(self):
         # driver is not connected, wait for captcha event
@@ -319,25 +340,39 @@ class ApiClient:
         """Process driver level events"""
         if event.type == EventNameToHandler.captcha_request.value:
             self._captcha_future.set_result(event)
-        if event.type == EventNameToHandler.verify_code.value:
+        elif event.type == EventNameToHandler.verify_code.value:
             self._mfa_future.set_result(event)
+        elif event.type == EventNameToHandler.connected.value:
+            self._driver_connected = True
+        elif event.type in (
+            EventNameToHandler.disconnected.value,
+            EventNameToHandler.connection_error.value,
+        ):
+            self._driver_connected = False
+            self._listening = False
 
     async def _on_open(self) -> None:
         _LOGGER.debug("on_open - executed")
 
     def _on_close(self, future="") -> None:
-        _LOGGER.debug(f"on_close - executed - {future} = {future.exception()}")
-        if self._on_error_callback is not None:
+        """WebSocket idle-close is normal; only notify HA on real failures."""
+        self._listening = False
+        exc = None
+        if future not in ("", None) and hasattr(future, "exception"):
+            try:
+                exc = future.exception()
+            except Exception:  # pylint: disable=broad-except
+                exc = None
+        _LOGGER.debug("on_close - websocket to add-on closed (exc=%s)", exc)
+        if exc is not None and self._on_error_callback is not None:
             self._on_error_callback(future)
-        if future.exception() is not None:
-            _LOGGER.debug(f"on_close - executed - {future.exception()}")
-            raise future.exception()
 
     async def _on_error(self, error: str) -> None:
         _LOGGER.error(f"on_error - {error}")
         raise WebSocketConnectionException(error)
 
     async def _send_message_get_response(self, message: OutgoingMessage) -> dict:
+        await self._ensure_ws()
         future: "asyncio.Future[dict]" = asyncio.get_event_loop().create_future()
         self._result_futures[message.id] = future
         await self.send_message(message.content)
@@ -354,12 +389,14 @@ class ApiClient:
     async def disconnect(self):
         """Disconnect the web socket and destroy it"""
         self._on_error_callback = None
+        self._driver_connected = False
+        self._listening = False
         await self._client.disconnect()
         self._client = None
 
     @property
     def available(self) -> bool:
-        return self._client.available
+        return self.is_operational
 
 
 

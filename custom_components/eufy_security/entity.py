@@ -47,4 +47,7 @@ class EufySecurityEntity(CoordinatorEntity):
 
     @property
     def available(self) -> bool:
-        return self.coordinator.available
+        api = getattr(self.coordinator, "_api", None)
+        if api is None:
+            return False
+        return api.is_operational

@@ -84,6 +84,13 @@ class EufySecurityLock(LockEntity, EufySecurityEntity):
         return self._control_product
 
     @property
+    def available(self) -> bool:
+        api = getattr(self.coordinator, "_api", None)
+        if api is None:
+            return False
+        return api.is_operational
+
+    @property
     def is_locked(self) -> Optional[bool]:
         return self._control_product.get_lock_state()
 
