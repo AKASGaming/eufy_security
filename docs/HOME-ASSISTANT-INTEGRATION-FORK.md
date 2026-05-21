@@ -30,13 +30,13 @@ Alternative: **HACS** → **Integrations** → **Eufy Security** → **⋮** →
 
 ## Version
 
-**8.2.50** on branch **`master`** (default; matches upstream). Branch **`main`** is kept in sync for older links.
+**8.2.54** on branch **`master`** (default). Branch **`main`** is kept in sync.
 
 ## Not in the brands / integration list?
 
 ### UTF-8 BOM in manifest (fixed in 8.2.50+)
 
-If there are **no** `eufy_security` lines in HA logs, `manifest.json` may have been saved with a **UTF-8 BOM** (`EF BB BF` before `{`). Home Assistant then **ignores** the integration entirely. Redownload from this repo after the BOM fix, or use [MANUAL-INSTALL.md](MANUAL-INSTALL.md).
+If there are **no** `eufy_security` lines in HA logs and the integration vanished from **Add integration** search, `manifest.json` likely has a **UTF-8 BOM** (`EF BB BF` before `{`). Home Assistant then **ignores** the integration entirely (no brands tile, no search hit). **Redownload 8.2.54+** from this repo, or use [MANUAL-INSTALL.md](MANUAL-INSTALL.md). On Windows, verify the file starts with `{` not invisible BOM (see MANUAL-INSTALL).
 
 ### HACS branch / master
 

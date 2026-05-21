@@ -1,0 +1,2 @@
+# Prevent UTF-8 BOM on manifest (HA silently ignores integrations with BOM)
+custom_components/eufy_security/manifest.json text eol=lf -diff
