@@ -32,14 +32,23 @@ class EufySecurityDataUpdateCoordinator(DataUpdateCoordinator):
         super().__init__(hass, _LOGGER, name=DOMAIN, update_method=self._update_local, update_interval=timedelta(seconds=self.config.sync_interval))
         self._platforms = []
         self.data = {}
-        self._lock_command_locks: dict[str, asyncio.Lock] = {}
+        self._lock_command_busy: dict[str, bool] = {}
+        self._lock_command_slot: asyncio.Lock = asyncio.Lock()
         self._api = ApiClient(self.config, aiohttp_client.async_get_clientsession(self.hass), self._on_error)
 
-    def lock_command_lock(self, serial_no: str) -> asyncio.Lock:
-        """Serialize lock/unlock commands per device (avoids rapid-toggle desync)."""
-        if serial_no not in self._lock_command_locks:
-            self._lock_command_locks[serial_no] = asyncio.Lock()
-        return self._lock_command_locks[serial_no]
+    def is_lock_command_busy(self, serial_no: str) -> bool:
+        return self._lock_command_busy.get(serial_no, False)
+
+    async def try_begin_lock_command(self, serial_no: str) -> bool:
+        """Take the single in-flight slot for this lock (no queuing)."""
+        async with self._lock_command_slot:
+            if self._lock_command_busy.get(serial_no):
+                return False
+            self._lock_command_busy[serial_no] = True
+            return True
+
+    def end_lock_command(self, serial_no: str) -> None:
+        self._lock_command_busy[serial_no] = False
 
     async def initialize(self):
         """Initialize the integration"""
