@@ -166,8 +166,7 @@ class Product:
                 if locked is not None:
                     self._apply_lock_properties(locked)
             else:
-                self.properties[name] = value
-                self._sync_property_to_paired(name, value)
+                self._apply_lock_properties(bool(value))
             return
 
         self.properties[name] = value
@@ -241,14 +240,26 @@ class Product:
             return False
         return None
 
-    def get_lock_state(self) -> Optional[bool]:
-        """Return lock state; prefer live lockStatus over stale ``locked`` at startup."""
-        lock_status = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
-        if lock_status is not None:
-            return lock_status
+    def lock_state_matches(self, target: bool) -> bool:
+        """True if either ``locked`` or ``lockStatus`` reflects the target (MQTT may update one first)."""
         locked = self.properties.get(MessageField.LOCKED.value)
-        if locked is not None:
-            return bool(locked)
+        if locked is not None and bool(locked) == target:
+            return True
+        lock_status = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
+        return lock_status is not None and lock_status == target
+
+    def get_lock_state(self) -> Optional[bool]:
+        """Return lock state; when properties disagree, trust ``locked`` (MQTT) over lagging lockStatus."""
+        locked_val = self.properties.get(MessageField.LOCKED.value)
+        status_val = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
+        if locked_val is not None and status_val is not None:
+            if bool(locked_val) != status_val:
+                return bool(locked_val)
+            return status_val
+        if status_val is not None:
+            return status_val
+        if locked_val is not None:
+            return bool(locked_val)
         paired = self._paired_device()
         if paired is not None:
             return paired.get_lock_state()

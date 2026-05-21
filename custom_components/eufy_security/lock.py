@@ -19,7 +19,8 @@ from .eufy_security_api.product import Device, Product
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
-LOCK_CONFIRM_TIMEOUT = 20
+LOCK_CONFIRM_TIMEOUT = 25
+LOCK_CONFIRM_POLL_SECONDS = 5
 LOCK_GRACE_SECONDS = 0.5
 
 
@@ -109,20 +110,15 @@ class EufySecurityLock(EufySecurityEntity, LockEntity):
         if not self.coordinator.is_lock_command_busy(self._control_product.serial_no):
             self.async_write_ha_state()
 
-    async def _wait_for_lock_state(self, target: bool) -> bool:
-        """Wait until MQTT/heartbeat reports the requested state."""
+    async def _wait_for_lock_state(self, target: bool, timeout: float = LOCK_CONFIRM_TIMEOUT) -> bool:
+        """Wait until MQTT/heartbeat reports the requested state on any lock property."""
         loop = asyncio.get_running_loop()
-        deadline = loop.time() + LOCK_CONFIRM_TIMEOUT
+        deadline = loop.time() + timeout
         while loop.time() < deadline:
-            if self._control_product.get_lock_state() == target:
+            if self._control_product.lock_state_matches(target):
+                self._control_product._apply_lock_properties(target)
                 return True
             await asyncio.sleep(0.25)
-        _LOGGER.warning(
-            "Lock %s did not confirm locked=%s within %ss",
-            self._control_product.serial_no,
-            target,
-            LOCK_CONFIRM_TIMEOUT,
-        )
         return False
 
     async def _set_locked(self, value: bool) -> None:
@@ -159,10 +155,21 @@ class EufySecurityLock(EufySecurityEntity, LockEntity):
                 MessageField.LOCKED.value,
                 value,
             )
-            if not await self._wait_for_lock_state(value):
-                raise HomeAssistantError(
-                    f"Lock did not confirm {'locked' if value else 'unlocked'} in time"
+            confirmed = await self._wait_for_lock_state(value)
+            if not confirmed:
+                try:
+                    await self.coordinator.api.poll_refresh()
+                except WebSocketConnectionException:
+                    pass
+                confirmed = await self._wait_for_lock_state(value, timeout=LOCK_CONFIRM_POLL_SECONDS)
+            if not confirmed:
+                # Add-on accepted the command; MQTT echo can lag behind the physical lock.
+                _LOGGER.warning(
+                    "Lock %s: no property echo for locked=%s, assuming success after add-on OK",
+                    serial,
+                    value,
                 )
+                self._control_product._apply_lock_properties(value)
         except (FailedCommandException, WebSocketConnectionException) as exc:
             raise HomeAssistantError(f"Lock command failed: {exc}") from exc
         finally:
