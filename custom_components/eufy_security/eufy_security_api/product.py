@@ -248,20 +248,38 @@ class Product:
         lock_status = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
         return lock_status is not None and lock_status == target
 
-    def get_lock_state(self) -> Optional[bool]:
-        """Return lock state; when properties disagree, trust ``locked`` (MQTT) over lagging lockStatus."""
-        locked_val = self.properties.get(MessageField.LOCKED.value)
+    def reconcile_lock_state(self) -> None:
+        """Align ``locked`` with ``lockStatus`` after startup (locked often loads stale)."""
         status_val = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
-        if locked_val is not None and status_val is not None:
-            if bool(locked_val) != status_val:
-                return bool(locked_val)
-            return status_val
+        if status_val is None:
+            return
+        locked_val = self.properties.get(MessageField.LOCKED.value)
+        if locked_val is None or bool(locked_val) != status_val:
+            _LOGGER.debug(
+                "Reconciling lock state for %s from lockStatus -> locked=%s (was locked=%s, lockStatus=%s)",
+                self.serial_no,
+                status_val,
+                locked_val,
+                self.properties.get(MessageField.LOCK_STATUS.value),
+            )
+            self._apply_lock_properties(status_val)
+
+    def get_lock_state(self) -> Optional[bool]:
+        """Return lock state; while idle, trust lockStatus (3/4) when it disagrees with stale ``locked``."""
+        if self._lock_pending_target is not None:
+            return self._lock_pending_target
+
+        status_val = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
+        locked_val = self.properties.get(MessageField.LOCKED.value)
+
         if status_val is not None:
+            if locked_val is not None and bool(locked_val) != status_val:
+                return status_val
             return status_val
         if locked_val is not None:
             return bool(locked_val)
         paired = self._paired_device()
-        if paired is not None:
+        if paired is not None and paired is not self:
             return paired.get_lock_state()
         return None
 

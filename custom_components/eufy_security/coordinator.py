@@ -65,6 +65,7 @@ class EufySecurityDataUpdateCoordinator(DataUpdateCoordinator):
             raise ConfigEntryNotReady() from exc
         except WebSocketConnectionException as exc:
             raise ConfigEntryNotReady() from exc
+        self._api.reconcile_all_lock_states()
 
     @property
     def platforms(self):

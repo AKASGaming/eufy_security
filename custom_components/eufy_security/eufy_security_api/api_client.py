@@ -127,6 +127,15 @@ class ApiClient:
 
         self._devices = await self._get_products(ProductType.device, result[MessageField.STATE.value]["devices"])
         self._stations = await self._get_products(ProductType.station, result[MessageField.STATE.value]["stations"])
+        self.reconcile_all_lock_states()
+
+    def reconcile_all_lock_states(self) -> None:
+        """Align lock properties after initial property fetch (locked is often stale)."""
+        for product in self._devices.values():
+            product.reconcile_lock_state()
+        for serial_no, station in self._stations.items():
+            if serial_no not in self._devices:
+                station.reconcile_lock_state()
 
     async def _get_products(self, product_type: ProductType, products: list) -> dict:
         response = {}
