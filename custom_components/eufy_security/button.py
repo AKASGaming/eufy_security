@@ -20,16 +20,18 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     product_properties = []
     for product in list(coordinator.devices.values()) + list(coordinator.stations.values()):
         for command in ProductCommand:
-            handler_func = getattr(product, f"{command.name}", None)
-            if handler_func is None:
+            if getattr(product, command.name, None) is None:
                 continue
-            if command.value.command is not None:
-                if command.value.command == "is_rtsp_enabled":
+            remote_cmd = command.value.command
+            if remote_cmd is not None:
+                if remote_cmd == "is_rtsp_enabled":
                     if product.is_rtsp_enabled is False:
                         continue
-                else:
-                    if command.value.command not in product.commands:
-                        continue
+                elif remote_cmd not in product.commands:
+                    continue
+            elif command.name not in product.commands:
+                # e.g. trigger_alarm / reset_alarm without a remote command id
+                continue
 
             product_properties.append(
                 Metadata.parse(product, {"name": command.name, "label": command.value.description, "command": command.value})

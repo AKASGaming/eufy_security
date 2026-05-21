@@ -4,14 +4,14 @@ from typing import Any, Optional
 from homeassistant.components.lock import LockEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import ATTR_CODE
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import COORDINATOR, DOMAIN
 from .coordinator import EufySecurityDataUpdateCoordinator
 from .entity import EufySecurityEntity
-from .eufy_security_api.const import MessageField, ProductType
+from .eufy_security_api.const import MessageField
 from .eufy_security_api.metadata import Metadata
 from .eufy_security_api.product import Device, Product
 
@@ -54,13 +54,19 @@ async def async_setup_entry(
     coordinator: EufySecurityDataUpdateCoordinator = hass.data[DOMAIN][COORDINATOR]
     entities = []
     for product, locked_meta in _iter_lock_setups(coordinator):
-        _LOGGER.debug(
+        _LOGGER.info(
             "Registering lock entity for %s (%s)",
             product.name,
             product.serial_no,
         )
         entities.append(EufySecurityLock(coordinator, locked_meta, product))
 
+    if not entities:
+        _LOGGER.warning(
+            "No lock entities created (devices=%s stations=%s)",
+            list(coordinator.devices),
+            list(coordinator.stations),
+        )
     async_add_entities(entities)
 
 
@@ -87,13 +93,22 @@ class EufySecurityLock(EufySecurityEntity, LockEntity):
     def is_locked(self) -> Optional[bool]:
         return self._control_product.get_lock_state()
 
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        super()._handle_coordinator_update()
+        self.async_write_ha_state()
+
     async def _set_locked(self, value: bool) -> None:
         if self._control_product.is_safe_lock is True and value is False:
             raise HomeAssistantError(
                 f"Unlocking is not supported for safe lock ({self._control_product.name})"
             )
+        # T85D0 / MQTT locks actuate via the ``locked`` property in the add-on driver.
         await self.coordinator.api.set_property(
-            ProductType.device, self._control_product.serial_no, self.metadata.name, value
+            self._control_product.product_type,
+            self._control_product.serial_no,
+            MessageField.LOCKED.value,
+            value,
         )
 
     async def async_lock(self, **kwargs: Any) -> None:

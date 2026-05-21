@@ -106,8 +106,22 @@ class Product:
             callback_func = self.state_update_listener
             callback_func()
 
+    def _sync_property_to_paired(self, name: str, value: Any) -> None:
+        """Standalone locks share a serial on device + station; keep both in sync."""
+        if name not in (MessageField.LOCKED.value, MessageField.LOCK_STATUS.value):
+            return
+        if self.product_type == ProductType.device:
+            other = self.api.stations.get(self.serial_no)
+        else:
+            other = self.api.devices.get(self.serial_no)
+        if other is not None and other is not self:
+            other.properties[name] = value
+
     async def _handle_property_changed(self, event: Event):
-        self.properties[event.data[MessageField.NAME.value]] = event.data[MessageField.VALUE.value]
+        name = event.data[MessageField.NAME.value]
+        value = event.data[MessageField.VALUE.value]
+        self.properties[name] = value
+        self._sync_property_to_paired(name, value)
 
     async def _handle_pin_verified(self, event: Event):
         self.pin_verified_future.set_result(event)
@@ -145,37 +159,46 @@ class Product:
     def supports_lock_entity(self) -> bool:
         """Whether this product should expose a Home Assistant lock entity."""
         locked_meta = self.metadata.get(MessageField.LOCKED.value)
-        if locked_meta is not None:
-            if self.has(MessageField.LOCKED.value) or self.has(MessageField.LOCK_STATUS.value):
-                return True
-            return bool(locked_meta.writeable)
+        if locked_meta is not None and locked_meta.writeable:
+            return self.has(MessageField.LOCKED.value) or self.has(MessageField.LOCK_STATUS.value)
         paired = self._paired_device()
         if paired is not None:
             return paired.supports_lock_entity()
         return False
 
     def get_lock_metadata(self) -> Optional[Metadata]:
-        """Metadata for the locked property (device preferred over station)."""
+        """Writable metadata used for lock/unlock commands (always ``locked`` when present)."""
         locked_meta = self.metadata.get(MessageField.LOCKED.value)
-        if locked_meta is not None:
+        if locked_meta is not None and locked_meta.writeable:
             return locked_meta
         paired = self._paired_device()
         if paired is not None:
-            return paired.metadata.get(MessageField.LOCKED.value)
+            return paired.get_lock_metadata()
+        return locked_meta
+
+    @staticmethod
+    def _lock_status_to_bool(lock_status: Any) -> Optional[bool]:
+        """Eufy MQTT lockStatus: 4=locked, 3=unlocked."""
+        if lock_status is None:
+            return None
+        try:
+            status = int(lock_status)
+        except (TypeError, ValueError):
+            return None
+        if status == 4:
+            return True
+        if status == 3:
+            return False
         return None
 
     def get_lock_state(self) -> Optional[bool]:
-        """Return lock state from locked and/or lockStatus (Eufy: 4=locked, 3=unlocked)."""
+        """Return lock state; prefer live lockStatus over stale ``locked`` at startup."""
+        lock_status = self._lock_status_to_bool(self.properties.get(MessageField.LOCK_STATUS.value))
+        if lock_status is not None:
+            return lock_status
         locked = self.properties.get(MessageField.LOCKED.value)
         if locked is not None:
             return bool(locked)
-        lock_status = self.properties.get(MessageField.LOCK_STATUS.value)
-        if lock_status is not None:
-            if lock_status == 4:
-                return True
-            if lock_status == 3:
-                return False
-            return None
         paired = self._paired_device()
         if paired is not None:
             return paired.get_lock_state()

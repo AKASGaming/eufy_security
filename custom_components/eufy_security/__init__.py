@@ -12,7 +12,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 from .const import COORDINATOR, DOMAIN, PLATFORMS
 from .coordinator import EufySecurityDataUpdateCoordinator
-from .registry_util import async_enable_preferred_entities
+from .registry_util import async_disable_unsupported_buttons, async_enable_preferred_entities
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
 
@@ -61,6 +61,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
         coordinator.platforms.append(platform.value)
 
     await async_enable_preferred_entities(hass, config_entry)
+    await async_disable_unsupported_buttons(hass, config_entry)
     if config_entry.version < CONFIG_ENTRY_VERSION:
         await async_enable_preferred_entities(hass, config_entry, include_user_disabled=True)
         hass.config_entries.async_update_entry(config_entry, version=CONFIG_ENTRY_VERSION)
