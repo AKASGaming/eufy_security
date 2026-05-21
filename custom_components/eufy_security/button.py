@@ -25,7 +25,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
             remote_cmd = command.value.command
             if remote_cmd is not None:
                 if remote_cmd == "is_rtsp_enabled":
-                    if product.is_rtsp_enabled is False:
+                    if getattr(product, "is_rtsp_enabled", False) is not True:
                         continue
                 elif remote_cmd not in product.commands:
                     continue

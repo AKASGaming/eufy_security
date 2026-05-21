@@ -37,7 +37,7 @@ async def async_disable_unsupported_buttons(hass: HomeAssistant, config_entry: C
             remote_cmd = command.value.command
             if remote_cmd is not None:
                 if remote_cmd == "is_rtsp_enabled":
-                    supported = product.is_rtsp_enabled
+                    supported = getattr(product, "is_rtsp_enabled", False) is True
                 else:
                     supported = remote_cmd in product.commands
             else:

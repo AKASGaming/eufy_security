@@ -79,8 +79,8 @@ class EufySecurityLock(EufySecurityEntity, LockEntity):
         metadata: Metadata,
         control_product: Product,
     ) -> None:
-        super().__init__(coordinator, metadata)
         self._control_product = control_product
+        super().__init__(coordinator, metadata)
         self._attr_name = f"{control_product.name}"
         self._attr_entity_category = None
         self._attr_entity_registry_enabled_default = True
