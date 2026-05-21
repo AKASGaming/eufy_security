@@ -1,5 +1,5 @@
 ﻿import logging
-from typing import Any
+from typing import Any, Optional
 
 from homeassistant.components.lock import LockEntity
 from homeassistant.config_entries import ConfigEntry
@@ -61,7 +61,7 @@ class EufySecurityLock(LockEntity, EufySecurityEntity):
         self._attr_name = f"{self.product.name}"
 
     @property
-    def is_locked(self) -> bool | None:
+    def is_locked(self) -> Optional[bool]:
         return self.product.get_lock_state()
 
     async def _set_locked(self, value: bool) -> None:

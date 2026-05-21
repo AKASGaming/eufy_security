@@ -1,7 +1,7 @@
 import asyncio
 from collections.abc import Callable
 import logging
-from typing import Any
+from typing import Any, Optional
 
 from .const import EventNameToHandler, MessageField, ProductCommand, ProductType, UNSUPPORTED
 from .event import Event
@@ -144,7 +144,7 @@ class Product:
             return True
         return bool(locked_meta.writeable)
 
-    def get_lock_state(self) -> bool | None:
+    def get_lock_state(self) -> Optional[bool]:
         """Return lock state from locked and/or lockStatus (Eufy: 4=locked, 3=unlocked)."""
         locked = self.properties.get(MessageField.LOCKED.value)
         if locked is not None:
