@@ -45,10 +45,9 @@ class EufySecurityEntity(CoordinatorEntity):
         super()._handle_coordinator_update()
 
     def _compute_available(self) -> bool:
+        """Stay available while the config entry is loaded (state updates via WS events)."""
         api = getattr(self.coordinator, "_api", None)
-        if api is None:
-            return False
-        return bool(api.devices or api.stations)
+        return api is not None
 
     @property
     def product(self) -> Product:

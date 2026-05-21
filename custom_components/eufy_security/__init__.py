@@ -12,8 +12,11 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers.typing import ConfigType
 from .const import COORDINATOR, DOMAIN, PLATFORMS
 from .coordinator import EufySecurityDataUpdateCoordinator
+from .registry_util import async_enable_preferred_entities
 
 _LOGGER: logging.Logger = logging.getLogger(__package__)
+
+CONFIG_ENTRY_VERSION = 2
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType):
@@ -57,6 +60,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry):
     for platform in PLATFORMS:
         coordinator.platforms.append(platform.value)
 
+    await async_enable_preferred_entities(hass, config_entry)
+    if config_entry.version < CONFIG_ENTRY_VERSION:
+        await async_enable_preferred_entities(hass, config_entry, include_user_disabled=True)
+        hass.config_entries.async_update_entry(config_entry, version=CONFIG_ENTRY_VERSION)
+
     async def update(event_time_utc):
         local_coordinator = hass.data[DOMAIN][COORDINATOR]
         await local_coordinator.async_refresh()
@@ -88,6 +96,16 @@ async def async_reload_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> 
     _LOGGER.debug(f"async_reload_entry 2")
     await async_setup_entry(hass, config_entry)
     _LOGGER.debug(f"async_reload_entry 3")
+
+
+async def async_migrate_entry(hass: HomeAssistant, config_entry: ConfigEntry) -> bool:
+    """Migrate config entry: re-enable lock, buttons, and debug entities in the registry."""
+    if config_entry.version >= CONFIG_ENTRY_VERSION:
+        return True
+    _LOGGER.info("Migrating eufy_security config entry to version %s", CONFIG_ENTRY_VERSION)
+    await async_enable_preferred_entities(hass, config_entry, include_user_disabled=True)
+    hass.config_entries.async_update_entry(config_entry, version=CONFIG_ENTRY_VERSION)
+    return True
 
 
 async def async_remove_config_entry_device(
