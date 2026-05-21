@@ -67,7 +67,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     platform.async_register_entity_service("snooze", Schema.SNOOZE.value, "_snooze")
 
 
-class EufySecurityCamera(Camera, EufySecurityEntity):
+class EufySecurityCamera(EufySecurityEntity, Camera):
     """Base camera entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:

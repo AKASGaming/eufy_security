@@ -1,4 +1,4 @@
-{
+﻿{
   "domain": "eufy_security",
   "name": "Eufy Security",
   "codeowners": ["@fuatakgun", "@AKASGaming"],
@@ -9,5 +9,5 @@
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/AKASGaming/eufy_security/issues",
   "requirements": ["websocket-client==1.8.0", "aiortsp==1.4.0"],
-  "version": "8.2.52"
+  "version": "8.2.53"
 }

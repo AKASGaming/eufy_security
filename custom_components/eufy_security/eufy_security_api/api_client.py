@@ -46,8 +46,8 @@ class ApiClient:
         self._client: WebSocketClient = WebSocketClient(self._config.host, self._config.port, session, self._on_open, self._on_message, self._on_close, self._on_error)
         self._on_error_callback = on_error_callback
         self._result_futures: dict[str, asyncio.Future] = {}
-        self._devices: dict = None
-        self._stations: dict = None
+        self._devices: dict = {}
+        self._stations: dict = {}
         self._captcha_future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
         self._mfa_future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
         self._driver_connected = False
@@ -78,7 +78,9 @@ class ApiClient:
     @property
     def is_operational(self) -> bool:
         """True when the add-on driver is up and products are loaded."""
-        return self._client is not None and self._driver_connected and bool(self._devices)
+        return self._client is not None and self._driver_connected and (
+            bool(self._devices) or bool(self._stations)
+        )
 
     async def _ensure_ws(self) -> None:
         """Reconnect WebSocket after idle close; add-on driver may still be connected."""

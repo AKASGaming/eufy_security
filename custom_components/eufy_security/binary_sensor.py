@@ -4,8 +4,6 @@ from homeassistant.components.binary_sensor import BinarySensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
-
 from .const import COORDINATOR, DOMAIN, Platform, PlatformToPropertyType
 from .coordinator import EufySecurityDataUpdateCoordinator
 from .entity import EufySecurityEntity
@@ -34,7 +32,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     async_add_entities(entities)
 
 
-class EufySecurityBinarySensor(BinarySensorEntity, EufySecurityEntity):
+class EufySecurityBinarySensor(EufySecurityEntity, BinarySensorEntity):
     """Base binary sensor entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:
@@ -46,17 +44,24 @@ class EufySecurityBinarySensor(BinarySensorEntity, EufySecurityEntity):
         return bool(get_child_value(self.product.properties, self.metadata.name))
 
 
-class EufySecurityProductEntity(BinarySensorEntity, CoordinatorEntity):
+class EufySecurityProductEntity(EufySecurityEntity, BinarySensorEntity):
     """Debug entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, product: Product) -> None:
-        super().__init__(coordinator)
-        self.product = product
-        self.product.set_state_update_listener(coordinator.async_update_listeners)
+        metadata = Metadata.parse(
+            product,
+            {"name": "debug", "label": "Debug", "readable": True, "writeable": False},
+        )
+        super().__init__(coordinator, metadata)
+        self._debug_product = product
+        self._attr_unique_id = f"{DOMAIN}_{product.product_type.value}_{product.serial_no}_debug"
+        self._attr_name = f"{product.name} Debug ({product.product_type.value})"
+        self._attr_entity_category = None
+        self._attr_entity_registry_enabled_default = False
 
-        self._attr_unique_id = f"{DOMAIN}_{self.product.product_type.value}_{self.product.serial_no}_debug"
-        self._attr_should_poll = False
-        self._attr_name = f"{self.product.name} Debug ({self.product.product_type.value})"
+    @property
+    def product(self) -> Product:
+        return self._debug_product
 
     @property
     def is_on(self):

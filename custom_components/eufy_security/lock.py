@@ -64,7 +64,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class EufySecurityLock(LockEntity, EufySecurityEntity):
+class EufySecurityLock(EufySecurityEntity, LockEntity):
     """Lock entity for Eufy smart locks (including T85D0 / T85L0 MQTT locks)."""
 
     def __init__(
@@ -82,13 +82,6 @@ class EufySecurityLock(LockEntity, EufySecurityEntity):
     @property
     def product(self) -> Product:
         return self._control_product
-
-    @property
-    def available(self) -> bool:
-        api = getattr(self.coordinator, "_api", None)
-        if api is None:
-            return False
-        return api.is_operational
 
     @property
     def is_locked(self) -> Optional[bool]:

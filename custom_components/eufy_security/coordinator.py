@@ -9,7 +9,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.components.persistent_notification import create
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers import aiohttp_client
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import DOMAIN, DISCONNECTED
 from .eufy_security_api.api_client import ApiClient
@@ -65,6 +65,11 @@ class EufySecurityDataUpdateCoordinator(DataUpdateCoordinator):
         """get stations from API"""
         return self._api.stations
 
+    @property
+    def api(self) -> ApiClient:
+        """WebSocket API client for the Eufy Security add-on."""
+        return self._api
+
     async def set_mfa_and_connect(self, mfa_input: str):
         """set mfa and connect"""
         await self._api.set_mfa_and_connect(mfa_input)
@@ -87,9 +92,9 @@ class EufySecurityDataUpdateCoordinator(DataUpdateCoordinator):
             _LOGGER.debug(f"coordinator - start update_local")
             await self._api.poll_refresh()
             _LOGGER.debug(f"coordinator - complete update_local")
-            return self.data
         except WebSocketConnectionException as exc:
-            raise UpdateFailed(f"Error communicating with Add-on: {exc}") from exc
+            _LOGGER.warning("poll_refresh failed (transient): %s", exc)
+        return self.data or {}
 
     async def disconnect(self):
         """disconnect from api"""

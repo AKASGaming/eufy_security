@@ -39,7 +39,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     async_add_entities(entities)
 
 
-class EufySecurityButtonEntity(ButtonEntity, EufySecurityEntity):
+class EufySecurityButtonEntity(EufySecurityEntity, ButtonEntity):
     """Base button entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:

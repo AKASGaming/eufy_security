@@ -51,7 +51,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     async_add_entities(entities)
 
 
-class EufySecuritySensor(SensorEntity, EufySecurityEntity):
+class EufySecuritySensor(EufySecurityEntity, SensorEntity):
     """Base sensor entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:

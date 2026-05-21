@@ -34,7 +34,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
     async_add_entities(entities)
 
 
-class EufySecurityImage(ImageEntity, EufySecurityEntity):
+class EufySecurityImage(EufySecurityEntity, ImageEntity):
     """Base image entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:

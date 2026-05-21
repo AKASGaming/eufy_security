@@ -85,7 +85,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: ConfigEntry, asyn
 
 
 
-class EufySecurityAlarmControlPanel(AlarmControlPanelEntity, EufySecurityEntity):
+class EufySecurityAlarmControlPanel(EufySecurityEntity, AlarmControlPanelEntity):
     """Base alarm control panel entity for integration"""
 
     def __init__(self, coordinator: EufySecurityDataUpdateCoordinator, metadata: Metadata) -> None:
